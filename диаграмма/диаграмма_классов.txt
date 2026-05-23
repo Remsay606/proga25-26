@@ -1,0 +1,155 @@
+@startuml
+' Включаем горизонтальную ориентацию для экономии места по вертикали
+left to right direction
+skinparam classAttributeIconSize 0
+skinparam ranksep 50
+skinparam nodesep 30
+
+package ru.codehub {
+    class Main {
+        + {static} main(args: String[]): void
+    }
+}
+
+package ru.codehub.collection {
+    interface CollectionManager {
+        + getInfo(): String
+        + show(): void
+        + clear(): void
+        + save(): void
+        + load(): void
+        + generateNextId(): int
+    }
+
+    class MusicBandCollectionManager {
+        - collection: LinkedHashSet<MusicBand>
+        - creationDate: java.time.ZonedDateTime
+        + MusicBandCollectionManager(filePath: String)
+        + getInfo(): String
+        + show(): void
+        + clear(): void
+        + save(): void
+        + load(): void
+        + generateNextId(): int
+        + getCollection(): LinkedHashSet<MusicBand>
+    }
+    CollectionManager <|.. MusicBandCollectionManager
+}
+
+package ru.codehub.command {
+    interface Command {
+        + getName(): String
+        + getDescription(): String
+        + execute(args: String[], scanner: java.util.Scanner): void
+    }
+
+    class CommandRegistry {
+        - commands: Map<String, Command>
+        - history: List<String>
+        + CommandRegistry()
+        + register(command: Command): void
+        + getCommand(name: String): Command
+        + getCommands(): Collection<Command>
+        + addToHistory(commandName: String): void
+        + getHistory(): List<String>
+    }
+}
+
+package ru.codehub.command.impl {
+    class AddCommand {
+        - collectionManager: CollectionManager
+        + AddCommand(cm: CollectionManager)
+    }
+    class AddIfMaxCommand {
+        - collectionManager: CollectionManager
+        + AddIfMaxCommand(cm: CollectionManager)
+    }
+    class ClearCommand {
+        - collectionManager: CollectionManager
+        + ClearCommand(cm: CollectionManager)
+    }
+    class ExecuteScriptCommand {
+        - commandRegistry: CommandRegistry
+        + ExecuteScriptCommand(cr: CommandRegistry)
+    }
+    class ExitCommand {}
+    class HelpCommand {
+        - commandRegistry: CommandRegistry
+        + HelpCommand(cr: CommandRegistry)
+    }
+    class HistoryCommand {
+        - commandRegistry: CommandRegistry
+        + HistoryCommand(cr: CommandRegistry)
+    }
+    class InfoCommand {
+        - collectionManager: CollectionManager
+        + InfoCommand(cm: CollectionManager)
+    }
+    class RemoveByIdCommand {
+        - collectionManager: CollectionManager
+        + RemoveByIdCommand(cm: CollectionManager)
+    }
+    class SaveCommand {
+        - collectionManager: CollectionManager
+        + SaveCommand(cm: CollectionManager)
+    }
+    class ShowCommand {
+        - collectionManager: CollectionManager
+        + ShowCommand(cm: CollectionManager)
+    }
+    class UpdateCommand {
+        - collectionManager: CollectionManager
+        + UpdateCommand(cm: CollectionManager)
+    }
+
+    ' Компактная запись реализации интерфейса
+    Command <|.. AddCommand
+    Command <|.. AddIfMaxCommand
+    Command <|.. ClearCommand
+    Command <|.. ExecuteScriptCommand
+    Command <|.. ExitCommand
+    Command <|.. HelpCommand
+    Command <|.. HistoryCommand
+    Command <|.. InfoCommand
+    Command <|.. RemoveByIdCommand
+    Command <|.. SaveCommand
+    Command <|.. ShowCommand
+    Command <|.. UpdateCommand
+}
+
+package ru.codehub.input {
+    class ScriptInputReader {
+        + {static} readScript(file: java.io.File): List<String>
+    }
+    class UserInputReader {
+        + {static} readString(scanner: java.util.Scanner, message: String): String
+        + {static} readInt(scanner: java.util.Scanner, message: String): int
+    }
+}
+
+package ru.codehub.io {
+    class CollectionReader {
+        + readCollection(path: String): List<String>
+    }
+    class CollectionWriter {
+        + writeCollection(path: String, data: String): void
+    }
+    class CsvCollectionWriter {
+        + write(path: String, data: String): void
+    }
+}
+
+' Основные связи управления (используем направленные стрелки для оптимизации размещения)
+ru.codehub.Main .right.> ru.codehub.command.CommandRegistry : <<use>>
+ru.codehub.Main .right.> ru.codehub.collection.CollectionManager : <<create>>
+
+ru.codehub.command.impl.AddCommand -up-o ru.codehub.collection.CollectionManager
+ru.codehub.command.impl.ClearCommand -up-o ru.codehub.collection.CollectionManager
+ru.codehub.command.impl.ShowCommand -up-o ru.codehub.collection.CollectionManager
+ru.codehub.command.impl.SaveCommand -up-o ru.codehub.collection.CollectionManager
+
+ru.codehub.command.impl.ExecuteScriptCommand -down-o ru.codehub.command.CommandRegistry
+ru.codehub.command.impl.HelpCommand -down-o ru.codehub.command.CommandRegistry
+ru.codehub.command.impl.HistoryCommand -down-o ru.codehub.command.CommandRegistry
+
+@enduml
