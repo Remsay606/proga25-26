@@ -1,0 +1,28 @@
+add
+ppp
+oky
+23
+23
+blues
+
+
+add
+ppp
+42
+42
+42
+blues
+
+
+
+execute_script script1.txt
+execute_script script.txt
+
+
+
+
+
+
+
+
+
