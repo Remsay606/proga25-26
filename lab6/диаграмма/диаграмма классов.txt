@@ -1,0 +1,313 @@
+@startuml lab6
+scale 0.35
+!pragma layout smetana
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam defaultFontSize 8
+skinparam nodesep 15
+skinparam ranksep 15
+skinparam minClassWidth 60
+
+' ============================================================
+' COMMON
+' ============================================================
+package "common.model" {
+
+    enum MusicGenre {
+        PSYCHEDELIC_ROCK
+        BLUES
+        POST_ROCK
+        POST_PUNK
+    }
+
+    class Coordinates {
+        - x : int
+        - y : double
+        + getX() : int
+        + getY() : double
+    }
+
+    class Studio {
+        - name : String
+        - address : String
+        + getName() : String
+        + getAddress() : String
+    }
+
+    class MusicBand {
+        - id : long
+        - name : String
+        - coordinates : Coordinates
+        - creationDate : Date
+        - numberOfParticipants : long
+        - genre : MusicGenre
+        - studio : Studio
+        + getId() : long
+        + setId(id : long) : void
+        + getName() : String
+        + getNumberOfParticipants() : long
+        + getCreationDate() : Date
+        + setCreationDate(d : Date) : void
+        + compareTo(other : MusicBand) : int
+    }
+
+    MusicBand --> Coordinates
+    MusicBand --> MusicGenre
+    MusicBand --> Studio
+}
+
+package "common.network" {
+
+    class CommandRequest {
+        - commandName : String
+        - musicBand : MusicBand
+        - args : String[]
+        + getCommandName() : String
+        + getMusicBand() : MusicBand
+        + getArgs() : String[]
+    }
+
+    class CommandResponse {
+        - message : String
+        - success : boolean
+        + getMessage() : String
+        + isSuccess() : boolean
+        + {static} ok(message : String) : CommandResponse
+        + {static} error(message : String) : CommandResponse
+    }
+
+    class Serializer {
+        + {static} serialize(obj : Object) : byte[]
+        + {static} deserialize(data : byte[]) : Object
+    }
+
+    CommandRequest --> MusicBand
+}
+
+' ============================================================
+' CLIENT
+' ============================================================
+package "client" {
+
+    class ClientMain {
+        - udpClient : UdpClient
+        - scanner : Scanner
+        - bandReader : MusicBandReader
+        + run() : void
+        - buildRequest(cmd : String, args : String[]) : CommandRequest
+        + {static} main(args : String[]) : void
+        + close() : void
+    }
+
+    class UdpClient {
+        - BUFFER_SIZE : int
+        - TIMEOUT_MS : int
+        - MAX_RETRIES : int
+        - serverAddress : InetSocketAddress
+        - channel : DatagramChannel
+        - selector : Selector
+        - openChannel() : void
+        + send(request : CommandRequest) : CommandResponse
+        + close() : void
+    }
+
+    class MusicBandReader {
+        - scanner : Scanner
+        + read() : MusicBand
+    }
+
+    class InputValidator {
+        + {static} isPositiveLong(s : String) : boolean
+        + {static} isNotBlank(s : String) : boolean
+    }
+
+    ClientMain --> UdpClient
+    ClientMain --> MusicBandReader
+    ClientMain --> InputValidator
+    UdpClient --> CommandRequest
+    UdpClient --> CommandResponse
+    UdpClient --> Serializer
+}
+
+' ============================================================
+' SERVER — network
+' ============================================================
+package "server.network" {
+
+    class UdpServer {
+        - BUFFER_SIZE : int
+        - port : int
+        - dispatcher : CommandDispatcher
+        - running : boolean
+        - channel : DatagramChannel
+        - selector : Selector
+        + start() : void
+        - handleIncoming(buffer : ByteBuffer) : void
+        - sendResponse(response : CommandResponse, addr : SocketAddress) : void
+        + stop() : void
+    }
+
+    UdpServer --> CommandDispatcher
+    UdpServer --> Serializer
+}
+
+' ============================================================
+' SERVER — collection
+' ============================================================
+package "server.collection" {
+
+    interface CollectionManager {
+        + add(band : MusicBand) : MusicBand
+        + remove(id : long) : boolean
+        + update(id : long, band : MusicBand) : Optional<MusicBand>
+        + clear() : void
+        + getById(id : long) : Optional<MusicBand>
+        + getAll() : List<MusicBand>
+        + pollHead() : Optional<MusicBand>
+        + getMax() : Optional<MusicBand>
+        + getMinByCreationDate() : Optional<MusicBand>
+        + groupByName() : Map<String, Long>
+        + filterByNameContains(s : String) : List<MusicBand>
+        + size() : int
+        + getInitializationDate() : Date
+        + getCollectionType() : String
+        + getCollection() : Collection<MusicBand>
+        + loadCollection(bands : Collection<MusicBand>) : void
+    }
+
+    class MusicBandCollectionManager {
+        - collection : PriorityQueue<MusicBand>
+        - idGenerator : IdGenerator
+        - initializationDate : Date
+    }
+
+    MusicBandCollectionManager ..|> CollectionManager
+    MusicBandCollectionManager --> IdGenerator
+    MusicBandCollectionManager --> MusicBand
+}
+
+' ============================================================
+' SERVER — command
+' ============================================================
+package "server.command" {
+
+    interface ServerCommandHandler {
+        + getCommandName() : String
+        + handle(request : CommandRequest) : CommandResponse
+    }
+
+    class CommandDispatcher {
+        - handlers : Map<String, ServerCommandHandler>
+        + register(handler : ServerCommandHandler) : void
+        + dispatch(request : CommandRequest) : CommandResponse
+    }
+
+    CommandDispatcher --> ServerCommandHandler
+
+    package "server.command.impl" {
+        class AddHandler
+        class AddIfMaxHandler
+        class UpdateHandler
+        class RemoveByIdHandler
+        class RemoveHeadHandler
+        class ClearHandler
+        class ShowHandler
+        class InfoHandler
+        class HelpHandler
+        class FilterContainsNameHandler
+        class GroupCountingByNameHandler
+        class MinByCreationDateHandler
+        class SaveHandler {
+            - manager : CollectionManager
+            - writer : CollectionWriter
+            - filePath : String
+        }
+
+        AddHandler ..|> ServerCommandHandler
+        AddIfMaxHandler ..|> ServerCommandHandler
+        UpdateHandler ..|> ServerCommandHandler
+        RemoveByIdHandler ..|> ServerCommandHandler
+        RemoveHeadHandler ..|> ServerCommandHandler
+        ClearHandler ..|> ServerCommandHandler
+        ShowHandler ..|> ServerCommandHandler
+        InfoHandler ..|> ServerCommandHandler
+        HelpHandler ..|> ServerCommandHandler
+        FilterContainsNameHandler ..|> ServerCommandHandler
+        GroupCountingByNameHandler ..|> ServerCommandHandler
+        MinByCreationDateHandler ..|> ServerCommandHandler
+        SaveHandler ..|> ServerCommandHandler
+
+        AddHandler --> CollectionManager
+        AddIfMaxHandler --> CollectionManager
+        UpdateHandler --> CollectionManager
+        RemoveByIdHandler --> CollectionManager
+        RemoveHeadHandler --> CollectionManager
+        ClearHandler --> CollectionManager
+        ShowHandler --> CollectionManager
+        InfoHandler --> CollectionManager
+        FilterContainsNameHandler --> CollectionManager
+        GroupCountingByNameHandler --> CollectionManager
+        MinByCreationDateHandler --> CollectionManager
+        SaveHandler --> CollectionManager
+        SaveHandler --> CollectionWriter
+    }
+}
+
+' ============================================================
+' SERVER — io
+' ============================================================
+package "server.io" {
+
+    interface CollectionReader {
+        + read(filePath : String) : Collection<MusicBand>
+    }
+
+    interface CollectionWriter {
+        + write(collection : Collection<MusicBand>, filePath : String) : void
+    }
+
+    class CsvCollectionReader
+    class CsvCollectionWriter
+
+    CsvCollectionReader ..|> CollectionReader
+    CsvCollectionWriter ..|> CollectionWriter
+}
+
+' ============================================================
+' SERVER — util + entry points
+' ============================================================
+package "server.util" {
+    class IdGenerator {
+        - currentId : long
+        + nextId() : long
+        + setCurrentId(id : long) : void
+    }
+}
+
+package "server" {
+
+    class ServerMain {
+        + {static} main(args : String[]) : void
+    }
+
+    class ServerConsole {
+        - manager : CollectionManager
+        - writer : CollectionWriter
+        - filePath : String
+        - stopServerCallback : Runnable
+        + run() : void
+    }
+
+    ServerMain --> UdpServer
+    ServerMain --> ServerConsole
+    ServerMain --> CollectionManager
+    ServerMain --> CollectionReader
+    ServerMain --> CollectionWriter
+    ServerMain --> CommandDispatcher
+    ServerConsole --> CollectionManager
+    ServerConsole --> CollectionWriter
+}
+
+@enduml
