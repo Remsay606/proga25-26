@@ -1,0 +1,9 @@
+# Подключение к PostgreSQL
+db.url=jdbc:postgresql://pg:5432/studs
+db.user=s504568
+db.password=
+
+# Первичный администратор (создаётся при первом запуске если его нет в БД)
+# Если пользователь с таким логином уже есть — пропускается
+admin.login=admin
+admin.password=admin123
