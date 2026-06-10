@@ -1,0 +1,277 @@
+@startuml lab7_part1
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "common.model" {
+    enum MusicGenre {
+        PSYCHEDELIC_ROCK
+        BLUES
+        POST_ROCK
+        POST_PUNK
+    }
+    class Coordinates {
+        - x : long
+        - y : double
+    }
+    class Studio {
+        - name : String
+        - address : String
+    }
+    class MusicBand {
+        - id : long
+        - name : String
+        - numberOfParticipants : long
+        - genre : MusicGenre
+        - owner : String
+        + getId() : long
+        + getOwner() : String
+        + compareTo(other : MusicBand) : int
+    }
+    class User {
+        - login : String
+        - password : String
+        + getLogin() : String
+        + getPassword() : String
+    }
+    MusicBand --> Coordinates
+    MusicBand --> MusicGenre
+    MusicBand --> Studio
+}
+
+package "common.network" {
+    class CommandRequest {
+        - commandName : String
+        - args : String[]
+        - band : MusicBand
+        - user : User
+        + setUser(user : User) : void
+    }
+    class CommandResponse {
+        - message : String
+        - success : boolean
+        + {static} ok(msg : String) : CommandResponse
+        + {static} error(msg : String) : CommandResponse
+    }
+    class Serializer {
+        + {static} serialize(obj : Object) : byte[]
+        + {static} deserialize(data : byte[]) : Object
+    }
+    CommandRequest --> MusicBand
+    CommandRequest --> User
+}
+
+package "client" {
+    class ClientMain {
+        - udpClient : UdpClient
+        - currentUser : User
+        + run() : void
+        - authLoop() : boolean
+        - commandLoop() : void
+    }
+    class UdpClient {
+        - channel : DatagramChannel
+        - selector : Selector
+        - MAX_RETRIES : int
+        + send(request : CommandRequest) : CommandResponse
+        + close() : void
+    }
+    class MusicBandReader {
+        - scanner : Scanner
+        + read() : MusicBand
+    }
+    class InputValidator {
+        + {static} isPositiveLong(s : String) : boolean
+        + {static} isNotBlank(s : String) : boolean
+    }
+    ClientMain --> UdpClient
+    ClientMain --> MusicBandReader
+    ClientMain --> InputValidator
+    UdpClient --> Serializer
+}
+
+@enduml
+
+
+
+@startuml lab7_part2
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "server.db" {
+    class DbConfig {
+        - url : String
+        - user : String
+        - adminLogin : String
+        - adminPassword : String
+        + {static} fromFile(path : String) : DbConfig
+    }
+    class DatabaseManager {
+        - connection : Connection
+        + connect() : void
+        - initSchema() : void
+        + getConnection() : Connection
+        + close() : void
+    }
+    class UserDao {
+        + register(login : String, hash : String) : boolean
+        + registerAdmin(login : String, hash : String) : boolean
+        + checkCredentials(login : String, hash : String) : boolean
+        + getRole(login : String) : String
+        + promoteToAdmin(login : String) : boolean
+        + demoteToUser(login : String, caller : String) : DemoteResult
+    }
+    class MusicBandDao {
+        + insert(band : MusicBand, owner : String) : long
+        + update(id : long, band : MusicBand, owner : String) : boolean
+        + deleteByIdAndOwner(id : long, owner : String) : boolean
+        + deleteById(id : long) : boolean
+        + deleteAll() : int
+        + findOwner(id : long) : String
+        + loadAll() : List
+    }
+    DatabaseManager --> DbConfig
+    UserDao --> DatabaseManager
+    MusicBandDao --> DatabaseManager
+}
+
+package "server.auth" {
+    class PasswordHasher {
+        + {static} hash(password : String) : String
+    }
+    class AuthService {
+        - userDao : UserDao
+        - initDefaultAdmin(config : DbConfig) : void
+        + register(user : User) : AuthResult
+        + authenticate(user : User) : AuthResult
+        + getRole(login : String) : String
+        + promoteToAdmin(target : String) : AuthResult
+        + demoteToUser(target : String, caller : String) : AuthResult
+    }
+    AuthService --> PasswordHasher
+    AuthService --> UserDao
+}
+
+package "server.collection" {
+    interface CollectionManager {
+        + add(band : MusicBand, owner : String) : MusicBand
+        + update(id : long, band : MusicBand, caller : String, ownerFilter : String) : ModifyResult
+        + remove(id : long, owner : String, isAdmin : boolean) : ModifyResult
+        + clearOwned(owner : String) : int
+        + clearAll() : int
+        + removeHead(owner : String, isAdmin : boolean) : ModifyResult
+        + getAll() : List
+        + size() : int
+        + loadFromDatabase() : void
+    }
+    class MusicBandCollectionManager {
+        - collection : PriorityQueue
+        - lock : Object
+        - initializationDate : Date
+    }
+    MusicBandCollectionManager ..|> CollectionManager
+    MusicBandCollectionManager --> MusicBandDao
+}
+
+@enduml
+
+
+
+
+
+
+
+
+@startuml lab7_part3
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "server.command" {
+    interface ServerCommandHandler {
+        + getCommandName() : String
+        + handle(request : CommandRequest, login : String, role : String) : CommandResponse
+    }
+    class CommandDispatcher {
+        - handlers : Map
+        - authService : AuthService
+        + register(handler : ServerCommandHandler) : void
+        + dispatch(request : CommandRequest) : CommandResponse
+    }
+    CommandDispatcher --> ServerCommandHandler
+}
+
+package "server.command.impl" {
+    class AddHandler
+    class AddIfMinHandler
+    class UpdateHandler
+    class RemoveByIdHandler
+    class RemoveHeadHandler
+    class ClearHandler
+    class ShowHandler
+    class InfoHandler
+    class HelpHandler
+    class FilterContainsNameHandler
+    class GroupCountingByNameHandler
+    class MinByCreationDateHandler
+    class PromoteUserHandler
+    class DemoteAdminHandler
+
+    AddHandler ..|> ServerCommandHandler
+    AddIfMinHandler ..|> ServerCommandHandler
+    UpdateHandler ..|> ServerCommandHandler
+    RemoveByIdHandler ..|> ServerCommandHandler
+    RemoveHeadHandler ..|> ServerCommandHandler
+    ClearHandler ..|> ServerCommandHandler
+    ShowHandler ..|> ServerCommandHandler
+    InfoHandler ..|> ServerCommandHandler
+    HelpHandler ..|> ServerCommandHandler
+    FilterContainsNameHandler ..|> ServerCommandHandler
+    GroupCountingByNameHandler ..|> ServerCommandHandler
+    MinByCreationDateHandler ..|> ServerCommandHandler
+    PromoteUserHandler ..|> ServerCommandHandler
+    DemoteAdminHandler ..|> ServerCommandHandler
+}
+
+package "server.network" {
+    class UdpServer {
+        - running : volatile boolean
+        - channel : DatagramChannel
+        - selector : Selector
+        - readPool : ExecutorService
+        - sendPool : ForkJoinPool
+        - sendLock : Object
+        + start() : void
+        + stop() : void
+    }
+}
+
+package "server" {
+    class ServerMain {
+        + {static} main(args : String[]) : void
+    }
+    class ServerConsole {
+        - stopServerCallback : Runnable
+        + run() : void
+    }
+    ServerMain --> UdpServer
+    ServerMain --> ServerConsole
+}
+
+@enduml
+
+
+
+
+
+
+
+
+
+
+
+

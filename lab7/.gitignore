@@ -1,0 +1,13 @@
+# Реквизиты БД — не хранить в репозитории
+db.cfg
+*.cfg
+!db.cfg.example
+
+# Сборка
+build/
+.gradle/
+*.jar
+
+# IDE
+.idea/
+*.iml
